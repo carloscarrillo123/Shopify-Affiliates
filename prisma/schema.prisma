@@ -1,0 +1,73 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Session {
+  id          String    @id
+  shop        String
+  state       String
+  isOnline    Boolean   @default(false)
+  scope       String?
+  expires     DateTime?
+  accessToken String
+  userId      BigInt?
+  firstName   String?
+  lastName    String?
+  email       String?
+  accountOwner Boolean  @default(false)
+  locale      String?
+  collaborator Boolean? @default(false)
+  emailVerified Boolean? @default(false)
+  refreshToken String?
+  refreshTokenExpires DateTime?
+}
+
+model Affiliate {
+  id            String       @id @default(cuid())
+  shop          String
+  name          String
+  email         String    @default("")
+  code          String
+  commissionPct Float        @default(10)
+  isActive      Boolean      @default(true)
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+  conversions   Conversion[]
+
+  @@unique([shop, code])
+}
+
+model Conversion {
+  id               String    @id @default(cuid())
+  shop             String
+  orderId          String
+  orderName        String?
+  orderTotal       Float
+  affiliatePayout  Float
+  appFee           Float
+  currency         String    @default("USD")
+  status           String    @default("pending")
+  billingChargeId  String?
+  processedAt      DateTime?
+  createdAt        DateTime  @default(now())
+  affiliateId      String
+  affiliate        Affiliate @relation(fields: [affiliateId], references: [id])
+
+  @@unique([shop, orderId])
+}
+
+model AppSubscription {
+  id             String   @id @default(cuid())
+  shop           String   @unique
+  subscriptionId String
+  status         String
+  cappedAmount   Float    @default(100)
+  currentBalance Float    @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}

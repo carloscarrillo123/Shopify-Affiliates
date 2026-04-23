@@ -1,0 +1,26 @@
+# Learn more about configuring your app at https://shopify.dev/docs/apps/tools/cli/configuration
+
+client_id = "a1a55f042d442baf892f77405d1eebe1"
+name = "affiliate-dev3"
+application_url = "https://conversion-narrative-magnetic-films.trycloudflare.com"
+embedded = true
+
+[build]
+automatically_update_urls_on_dev = true
+include_config_on_deploy = true
+dev_store_url = "afiliate-1.myshopify.com"
+
+[webhooks]
+api_version = "2026-07"
+
+[access_scopes]
+# Learn more at https://shopify.dev/docs/apps/tools/cli/configuration#access_scopes
+scopes = "read_customers,read_orders,read_pixels,read_customer_events,write_orders,write_pixels,write_script_tags"
+
+[auth]
+redirect_urls = [
+  "https://conversion-narrative-magnetic-films.trycloudflare.com/auth/callback",
+  "https://conversion-narrative-magnetic-films.trycloudflare.com/auth/shopify/callback",
+  "https://conversion-narrative-magnetic-films.trycloudflare.com/exitiframe",
+  "https://conversion-narrative-magnetic-films.trycloudflare.com/billing/callback"
+]

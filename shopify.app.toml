@@ -1,0 +1,35 @@
+name = "affiliate-engine"
+client_id = "a1566012d483c8b70d83d2c5a223703c"
+application_url = "https://your-app-url.com"
+embedded = true
+
+[build]
+automatically_update_urls_on_dev = true
+dev_store_url = "test-dev-shop-vfsekuie.myshopify.com"
+
+[access_scopes]
+scopes = "read_orders,write_orders,read_customers,write_script_tags,write_pixels,read_pixels"
+
+[auth]
+redirect_urls = [
+  "https://YOUR_APP_URL/auth/callback",
+  "https://YOUR_APP_URL/auth/shopify/callback",
+  "https://YOUR_APP_URL/exitiframe"
+]
+
+[webhooks]
+api_version = "2025-01"
+
+[[webhooks.subscriptions]]
+topics = ["orders/paid"]
+uri = "/webhooks"
+
+[pos]
+embedded = false
+
+[[web]]
+roles = ["backend"]
+
+[web.commands]
+dev = "npm run dev:local"
+build = "npm run build"

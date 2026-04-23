@@ -1,0 +1,24 @@
+type = "web_pixel"
+name = "Affiliate Tracking Pixel"
+handle = "affiliate-tracking-pixel"
+runtime_context = "strict"
+uid = "ef9e6b46-8fbc-c69c-958d-31283597744b50960b5c"
+
+[customer_privacy]
+analytics = true
+marketing = true
+preferences = false
+sale_of_data = "enabled"
+
+[settings]
+type = "object"
+
+[settings.fields.affiliateCode]
+name = "Affiliate Code"
+description = "Current affiliate referral code"
+type = "single_line_text_field"
+
+[settings.fields.apiUrl]
+name = "API URL"
+description = "Affiliate Engine conversion endpoint"
+type = "single_line_text_field"

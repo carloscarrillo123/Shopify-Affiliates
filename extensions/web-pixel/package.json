@@ -1,0 +1,15 @@
+{
+  "name": "affiliate-tracking-pixel",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "shopify app build extension"
+  },
+  "dependencies": {
+    "@shopify/web-pixels-extension": "^0.3.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.5.4"
+  }
+}
