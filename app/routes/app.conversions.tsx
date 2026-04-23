@@ -35,7 +35,7 @@ export default function ConversionsPage() {
       <IndexTable.Row id={id} key={id} position={index}>
         <IndexTable.Cell>
           <Text as="span" fontWeight="semibold">
-            {orderName ?? orderId}
+            {orderName || orderId}
           </Text>
         </IndexTable.Cell>
         <IndexTable.Cell>

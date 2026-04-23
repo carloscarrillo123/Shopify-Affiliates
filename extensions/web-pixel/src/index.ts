@@ -36,7 +36,7 @@ register(({ analytics, browser, settings }) => {
         || (settings as any).shop
         || "afiliate-1.myshopify.com";
       const orderId = String(order.order?.id ?? order.token ?? "");
-      const orderName = order.order?.name ?? "";
+      const orderName = order.order?.name || "";
       const orderTotal = parseFloat(
         String(order.totalPrice?.amount ?? order.subtotalPrice?.amount ?? 0)
       );

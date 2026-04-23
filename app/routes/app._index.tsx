@@ -312,7 +312,7 @@ export default function Dashboard() {
                       <InlineStack key={c.id} align="space-between">
                         <BlockStack gap="100">
                           <Text as="p" variant="bodyMd" fontWeight="semibold">
-                            {c.orderName ?? c.orderId}
+                            {c.orderName || c.orderId}
                           </Text>
                           <Text as="p" variant="bodySm" tone="subdued">
                             Affiliate:{" "}

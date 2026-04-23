@@ -17,7 +17,7 @@ interface ConversionPayload {
 }
 
 function verifySignature(payload: Omit<ConversionPayload, "signature">, signature: string): boolean {
-  const secret = process.env.SHOPIFY_API_SECRET || "";
+  const secret = process.env.PIXEL_SIGNING_SECRET || "change-me-in-production";
   const data = `${payload.shop}:${payload.affiliateCode}:${payload.orderId}:${payload.orderTotal}:${payload.timestamp}`;
   const expected = crypto.createHmac("sha256", secret).update(data).digest("hex");
   return crypto.timingSafeEqual(Buffer.from(expected, "hex"), Buffer.from(signature, "hex"));
@@ -96,7 +96,7 @@ export async function action({ request }: ActionFunctionArgs) {
       shop,
       affiliateId: affiliate.id,
       orderId,
-      orderName,
+      orderName: orderName || `#${orderId}`,
       orderTotal,
       appFee,
       affiliatePayout,
