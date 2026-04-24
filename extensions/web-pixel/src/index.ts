@@ -3,8 +3,8 @@ import { register } from "@shopify/web-pixels-extension";
 const AFFILIATE_KEY = "affiliate_ref";
 
 register(({ analytics, browser, settings }) => {
-  const apiUrl = ((settings as any).apiUrl as string | undefined)
-    || "https://conversion-narrative-magnetic-films.trycloudflare.com/api/conversion";
+  const apiUrl = (settings as any).apiUrl as string;
+  if (!apiUrl) return;
   analytics.subscribe("page_viewed", async (event) => {
     try {
       const href = event.context?.document?.location?.href ?? "";

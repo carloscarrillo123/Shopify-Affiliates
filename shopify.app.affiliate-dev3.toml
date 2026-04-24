@@ -2,7 +2,7 @@
 
 client_id = "a1a55f042d442baf892f77405d1eebe1"
 name = "affiliate-dev3"
-application_url = "https://conversion-narrative-magnetic-films.trycloudflare.com"
+application_url = "https://explains-remote-deeper-orbit.trycloudflare.com"
 embedded = true
 
 [build]
@@ -19,8 +19,8 @@ scopes = "read_customers,read_orders,read_pixels,read_customer_events,write_orde
 
 [auth]
 redirect_urls = [
-  "https://conversion-narrative-magnetic-films.trycloudflare.com/auth/callback",
-  "https://conversion-narrative-magnetic-films.trycloudflare.com/auth/shopify/callback",
-  "https://conversion-narrative-magnetic-films.trycloudflare.com/exitiframe",
-  "https://conversion-narrative-magnetic-films.trycloudflare.com/billing/callback"
+  "https://explains-remote-deeper-orbit.trycloudflare.com/auth/callback",
+  "https://explains-remote-deeper-orbit.trycloudflare.com/auth/shopify/callback",
+  "https://explains-remote-deeper-orbit.trycloudflare.com/exitiframe",
+  "https://explains-remote-deeper-orbit.trycloudflare.com/billing/callback"
 ]

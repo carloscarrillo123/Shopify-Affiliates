@@ -1,6 +1,7 @@
 import { data, redirect } from "react-router";
 import type { LoaderFunctionArgs, ActionFunctionArgs } from "react-router";
-import { useLoaderData, useSubmit, useNavigation } from "react-router";
+import { useLoaderData, useSubmit, useNavigation, useActionData } from "react-router";
+import { useState, useEffect } from "react";
 import {
   Page,
   Layout,
@@ -13,6 +14,8 @@ import {
   Banner,
   Button,
   InlineStack,
+  TextField,
+  FormLayout,
 } from "@shopify/polaris";
 import { authenticate } from "~/shopify.server";
 import { db } from "~/db.server";
@@ -24,7 +27,8 @@ async function ensureWebPixel(admin: any, appUrl: string) {
   });
 
   try {
-    const res = await admin.graphql(
+    // Try create first; if already exists, update instead
+    const createRes = await admin.graphql(
       `#graphql
       mutation webPixelCreate($webPixel: WebPixelInput!) {
         webPixelCreate(webPixel: $webPixel) {
@@ -34,32 +38,29 @@ async function ensureWebPixel(admin: any, appUrl: string) {
       }`,
       { variables: { webPixel: { settings: pixelSettings } } }
     );
-    const resData = await res.json();
-    const errors = resData?.data?.webPixelCreate?.userErrors ?? [];
+    const createData = await createRes.json();
+    const errors = createData?.data?.webPixelCreate?.userErrors ?? [];
     const alreadyExists = errors.some((e: any) =>
       e.message?.toLowerCase().includes("already") || e.code === "TAKEN"
     );
 
     if (alreadyExists) {
-      const queryRes = await admin.graphql(`#graphql
-        query { webPixel { id } }
-      `);
-      const queryData = await queryRes.json();
-      const pixelId = queryData?.data?.webPixel?.id;
-      if (pixelId) {
-        await admin.graphql(
-          `#graphql
-          mutation webPixelUpdate($id: ID!, $webPixel: WebPixelInput!) {
-            webPixelUpdate(id: $id, webPixel: $webPixel) {
-              userErrors { field message }
-              webPixel { id }
-            }
-          }`,
-          { variables: { id: pixelId, webPixel: { settings: pixelSettings } } }
-        );
-      }
+      const updateRes = await admin.graphql(
+        `#graphql
+        mutation webPixelUpdate($webPixel: WebPixelInput!) {
+          webPixelUpdate(webPixel: $webPixel) {
+            userErrors { field message }
+            webPixel { id }
+          }
+        }`,
+        { variables: { webPixel: { settings: pixelSettings } } }
+      );
+      const updateData = await updateRes.json();
+      console.log("[Pixel] updated:", JSON.stringify(updateData?.data?.webPixelUpdate?.webPixel));
     } else if (errors.length > 0) {
-      console.error("[Pixel] userErrors:", errors);
+      console.error("[Pixel] create errors:", errors);
+    } else {
+      console.log("[Pixel] created:", JSON.stringify(createData?.data?.webPixelCreate?.webPixel));
     }
   } catch (err: any) {
     if (err?.body instanceof ReadableStream) {
@@ -71,55 +72,53 @@ async function ensureWebPixel(admin: any, appUrl: string) {
   }
 }
 
-async function ensureBilling(admin: any, shop: string, appUrl: string) {
-  try {
-    const existing = await db.appSubscription.findUnique({ where: { shop } });
-    if (existing?.status === "ACTIVE") return null;
-
-    const response = await admin.graphql(
-      `#graphql
-      mutation appSubscriptionCreate($name: String!, $returnUrl: URL!, $lineItems: [AppSubscriptionLineItemInput!]!) {
-        appSubscriptionCreate(name: $name, returnUrl: $returnUrl, lineItems: $lineItems, test: true) {
-          userErrors { field message }
-          appSubscription { id status }
-          confirmationUrl
-        }
-      }`,
-      {
-        variables: {
-          name: "Affiliate Engine Plan",
-          returnUrl: `${appUrl}/billing/callback`,
-          lineItems: [
-            {
-              plan: {
-                appUsagePricingDetails: {
-                  cappedAmount: { amount: "100.00", currencyCode: "USD" },
-                  terms: "5% service fee on each referred sale. Max $100/month.",
-                },
+async function createBillingSubscription(
+  admin: any,
+  shop: string,
+  appUrl: string,
+  cappedAmount: number
+) {
+  const amount = cappedAmount.toFixed(2);
+  const response = await admin.graphql(
+    `#graphql
+    mutation appSubscriptionCreate($name: String!, $returnUrl: URL!, $lineItems: [AppSubscriptionLineItemInput!]!) {
+      appSubscriptionCreate(name: $name, returnUrl: $returnUrl, lineItems: $lineItems, test: true) {
+        userErrors { field message }
+        appSubscription { id status }
+        confirmationUrl
+      }
+    }`,
+    {
+      variables: {
+        name: "Affiliate Engine Plan",
+        returnUrl: `${appUrl}/billing/callback`,
+        lineItems: [
+          {
+            plan: {
+              appUsagePricingDetails: {
+                cappedAmount: { amount, currencyCode: "USD" },
+                terms: `5% service fee on each referred sale. Max $${amount}/month.`,
               },
             },
-          ],
-        },
-      }
-    );
-
-    const resData = await response.json();
-    const sub = resData?.data?.appSubscriptionCreate?.appSubscription;
-    const confirmationUrl = resData?.data?.appSubscriptionCreate?.confirmationUrl;
-
-    if (sub?.id) {
-      await db.appSubscription.upsert({
-        where: { shop },
-        create: { shop, subscriptionId: sub.id, status: sub.status },
-        update: { subscriptionId: sub.id, status: sub.status },
-      });
+          },
+        ],
+      },
     }
+  );
 
-    return confirmationUrl ?? null;
-  } catch (err) {
-    console.error("[Billing] Error:", err);
-    return null;
+  const resData = await response.json();
+  const sub = resData?.data?.appSubscriptionCreate?.appSubscription;
+  const confirmationUrl = resData?.data?.appSubscriptionCreate?.confirmationUrl;
+
+  if (sub?.id) {
+    await db.appSubscription.upsert({
+      where: { shop },
+      create: { shop, subscriptionId: sub.id, status: sub.status, cappedAmount },
+      update: { subscriptionId: sub.id, status: sub.status, cappedAmount },
+    });
   }
+
+  return confirmationUrl ?? null;
 }
 
 export async function loader({ request }: LoaderFunctionArgs) {
@@ -127,11 +126,13 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const shop = session.shop;
   const appUrl = process.env.SHOPIFY_APP_URL || "";
 
-  await ensureWebPixel(admin, appUrl);
+  if (process.env.NODE_ENV !== "development") {
+    await ensureWebPixel(admin, appUrl);
+  }
 
-  const confirmationUrl = await ensureBilling(admin, shop, appUrl);
-  if (confirmationUrl) {
-    throw redirect(confirmationUrl);
+  const existingSub = await db.appSubscription.findUnique({ where: { shop } });
+  if (!existingSub || existingSub.status !== "ACTIVE") {
+    return data({ needsBilling: true as const });
   }
 
   const [totalConversions, affiliatesCount, subscription] = await Promise.all([
@@ -177,9 +178,34 @@ export async function loader({ request }: LoaderFunctionArgs) {
 }
 
 export async function action({ request }: ActionFunctionArgs) {
-  const { session } = await authenticate.admin(request);
+  const { session, admin } = await authenticate.admin(request);
   const shop = session.shop;
   const formData = await request.formData();
+  const intent = formData.get("_action");
+
+  if (intent === "activate_billing") {
+    const raw = parseFloat(formData.get("cappedAmount") as string);
+    const cappedAmount = isNaN(raw) || raw < 1 ? 100 : raw;
+
+    if (process.env.NODE_ENV === "development") {
+      await db.appSubscription.upsert({
+        where: { shop },
+        create: { shop, subscriptionId: "dev-mock", status: "ACTIVE", cappedAmount },
+        update: { status: "ACTIVE", cappedAmount },
+      });
+      return redirect("/");
+    }
+
+    const appUrl = process.env.SHOPIFY_APP_URL || "";
+    try {
+      const confirmationUrl = await createBillingSubscription(admin, shop, appUrl, cappedAmount);
+      if (confirmationUrl) return data({ confirmationUrl });
+    } catch (err) {
+      console.error("[Billing] Action error:", err);
+    }
+    return data({ error: "Could not create billing subscription." });
+  }
+
   const affiliateId = formData.get("affiliateId") as string;
 
   const affiliate = await db.affiliate.findFirst({ where: { id: affiliateId, shop } });
@@ -235,12 +261,87 @@ function MetricCard({
   );
 }
 
+function BillingSetup() {
+  const [cappedAmount, setCappedAmount] = useState("100");
+  const submit = useSubmit();
+  const navigation = useNavigation();
+  const actionData = useActionData<{ confirmationUrl?: string; error?: string }>();
+  const isActivating = navigation.state === "submitting";
+
+  useEffect(() => {
+    if (actionData?.confirmationUrl) {
+      // Escape the Shopify iframe so the billing approval page loads in the parent frame
+      (window.top ?? window).location.href = actionData.confirmationUrl;
+    }
+  }, [actionData]);
+
+  const handleActivate = () => {
+    submit({ _action: "activate_billing", cappedAmount }, { method: "post" });
+  };
+
+  return (
+    <Page title="Activate Affiliate Engine">
+      <Layout>
+        <Layout.Section>
+          <Card>
+            <BlockStack gap="500">
+              {actionData?.error && (
+                <Banner title="Billing error" tone="critical">
+                  <p>{actionData.error}</p>
+                </Banner>
+              )}
+              <BlockStack gap="200">
+                <Text as="h2" variant="headingMd">
+                  Set your monthly billing cap
+                </Text>
+                <Text as="p" variant="bodyMd" tone="subdued">
+                  Affiliate Engine charges a 5% service fee on each referred sale.
+                  Set a monthly maximum — Shopify will never charge you beyond this amount.
+                </Text>
+              </BlockStack>
+              <FormLayout>
+                <TextField
+                  label="Monthly cap (USD)"
+                  type="number"
+                  value={cappedAmount}
+                  onChange={setCappedAmount}
+                  prefix="$"
+                  min={1}
+                  autoComplete="off"
+                  helpText="Minimum $1. You can request a cap increase from Shopify at any time."
+                />
+              </FormLayout>
+              <InlineStack>
+                <Button
+                  variant="primary"
+                  loading={isActivating}
+                  onClick={handleActivate}
+                >
+                  Activate Plan
+                </Button>
+              </InlineStack>
+            </BlockStack>
+          </Card>
+        </Layout.Section>
+      </Layout>
+    </Page>
+  );
+}
+
 export default function Dashboard() {
-  const { metrics, subscription, recentConversions, affiliates } =
-    useLoaderData<typeof loader>();
+  const loaderData = useLoaderData<typeof loader>();
   const submit = useSubmit();
   const navigation = useNavigation();
   const isSimulating = navigation.state === "submitting";
+
+  if ("needsBilling" in loaderData && loaderData.needsBilling) {
+    return <BillingSetup />;
+  }
+
+  const { metrics, subscription, recentConversions, affiliates } = loaderData as Exclude<
+    typeof loaderData,
+    { needsBilling: true }
+  >;
 
   const fmt = (n: number) =>
     new Intl.NumberFormat("en-US", {
